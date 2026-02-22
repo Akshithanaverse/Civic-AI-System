@@ -1,17 +1,35 @@
 import Issue from "../models/Issue.model.js";
-
+import cloudinary from "../config/cloudinary.js";
+import User from "../models/User.model.js";
 /**
- * Citizen creates an issue
+ * Citizen creates an issue (with optional image)
  */
 export const createIssue = async (req, res, next) => {
+  console.log("BODY:", req.body);
+console.log("FILE:", req.file);
+console.log("USER:", req.user);
   try {
-    const { title, description, category, location } = req.body;
+    const { title, description, category, lat, lng } = req.body;
+
+    if (!title || !description || !category || !lat || !lng) {
+      return res.status(400).json({ message: "All fields including location are required" });
+    }
+
+    let imageUrl = null;
+    if (req.file) {
+  const result = await cloudinary.uploader.upload(
+    `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`
+  );
+
+  imageUrl = result.secure_url;
+}
 
     const issue = await Issue.create({
       title,
       description,
       category,
-      location,
+      location: { lat: parseFloat(lat), lng: parseFloat(lng) },
+      images: imageUrl ? [imageUrl] : [],
       reportedBy: req.user._id
     });
 
@@ -45,6 +63,14 @@ export const getAllIssues = async (req, res, next) => {
 export const assignIssue = async (req, res, next) => {
   try {
     const { crewId } = req.body;
+
+    const crewUser = await User.findById(crewId);
+
+    if (!crewUser || crewUser.role !== "crew") {
+      return res.status(400).json({
+        message: "Invalid crew member"
+      });
+    }
 
     const issue = await Issue.findByIdAndUpdate(
       req.params.id,
@@ -81,6 +107,12 @@ export const updateIssueStatus = async (req, res, next) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
+    if (!issue.assignedTo || issue.assignedTo.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        message: "You are not assigned to this issue"
+      });
+    }
+
     issue.status = status;
     await issue.save();
 
@@ -88,6 +120,28 @@ export const updateIssueStatus = async (req, res, next) => {
       message: "Issue status updated",
       issue
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyIssues = async (req, res, next) => {
+  try {
+    const issues = await Issue.find({ reportedBy: req.user._id })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(issues);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAssignedIssues = async (req, res, next) => {
+  try {
+    const issues = await Issue.find({ assignedTo: req.user._id })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(issues);
   } catch (error) {
     next(error);
   }
