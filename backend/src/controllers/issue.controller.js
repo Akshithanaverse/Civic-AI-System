@@ -17,19 +17,38 @@ export const createIssue = async (req, res, next) => {
       return res.status(400).json({ message: "All fields including location are required" });
     }
 
-    // AI analysis (only if image is provided)
+    // AI analysis (image analysis if image provided, text analysis always)
     let aiCategory = null, aiConfidence = null, aiGeneratedDescription = null, aiSeverityScore = null, is_miscategorized = null;
+    let textClassification = null, textSummary = null, urgencyLevel = null, urgencyLabel = null, urgencyKeywords = [];
 
+    // Image analysis (only if image is provided)
     if (req.file) {
       try {
         const aiResponse = await axios.post("http://localhost:8000/analyze", {
           image: req.file.buffer.toString("base64")
         });
         ({ predicted_category: aiCategory, confidence_percent: aiConfidence, generated_description: aiGeneratedDescription, severity_score: aiSeverityScore, is_miscategorized } = aiResponse.data);
-      }  catch (aiError) {
-  console.error("AI service error:", aiError.message);  // change this line
-  console.error("AI service full error:", aiError.response?.data || aiError.message);
-}
+      } catch (aiError) {
+        console.error("AI service error:", aiError.message);
+        console.error("AI service full error:", aiError.response?.data || aiError.message);
+      }
+    }
+
+    // Text analysis (always, for description)
+    if (description && description.trim().length >= 3) {
+      try {
+        const textResponse = await axios.post("http://localhost:8000/analyze-text", {
+          text: description
+        });
+        const { classification, summary, urgency } = textResponse.data;
+        textClassification = classification;
+        textSummary = summary;
+        urgencyLevel = urgency.level;
+        urgencyLabel = urgency.label;
+        urgencyKeywords = urgency.keywords;
+      } catch (textError) {
+        console.error("Text analysis error:", textError.message);
+      }
     }
 
     // Upload image to Cloudinary (only if image is provided)
@@ -48,11 +67,18 @@ export const createIssue = async (req, res, next) => {
       location: { lat: parseFloat(lat), lng: parseFloat(lng) },
       images: imageUrl ? [imageUrl] : [],
       reportedBy: req.user._id,
+      // Computer Vision AI
       aiCategory,
       aiConfidence,
       aiGeneratedDescription,
       aiSeverityScore,
       is_miscategorized,
+      // NLP Text Analysis
+      textClassification,
+      textSummary,
+      urgencyLevel,
+      urgencyLabel,
+      urgencyKeywords,
     });
 
     res.status(201).json({
