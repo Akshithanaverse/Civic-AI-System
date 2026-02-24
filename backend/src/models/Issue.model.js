@@ -42,11 +42,25 @@ const issueSchema = new mongoose.Schema(
       ref: "User",
       default: null
     },
+    // Computer Vision AI Analysis
     aiCategory: String,
     aiConfidence: Number,
     aiGeneratedDescription: String,
     aiSeverityScore: Number,
     is_miscategorized: Boolean,
+    // NLP Text Analysis
+    textClassification: {
+      category: String,
+      confidence: Number
+    },
+    textSummary: String,
+    urgencyLevel: {
+      type: Number,
+      min: 1,
+      max: 5
+    },
+    urgencyLabel: String,
+    urgencyKeywords: [String],
   },
   { timestamps: true }
 );
