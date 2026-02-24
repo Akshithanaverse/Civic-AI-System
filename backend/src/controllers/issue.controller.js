@@ -1,13 +1,15 @@
 import Issue from "../models/Issue.model.js";
 import cloudinary from "../config/cloudinary.js";
 import User from "../models/User.model.js";
+import axios from "axios";
+
 /**
  * Citizen creates an issue (with optional image)
  */
 export const createIssue = async (req, res, next) => {
   console.log("BODY:", req.body);
-console.log("FILE:", req.file);
-console.log("USER:", req.user);
+  console.log("FILE:", req.file);
+  console.log("USER:", req.user);
   try {
     const { title, description, category, lat, lng } = req.body;
 
@@ -15,14 +17,29 @@ console.log("USER:", req.user);
       return res.status(400).json({ message: "All fields including location are required" });
     }
 
+    // AI analysis (only if image is provided)
+    let aiCategory = null, aiConfidence = null, aiGeneratedDescription = null, aiSeverityScore = null, is_miscategorized = null;
+
+    if (req.file) {
+      try {
+        const aiResponse = await axios.post("http://localhost:8000/analyze", {
+          image: req.file.buffer.toString("base64")
+        });
+        ({ predicted_category: aiCategory, confidence_percent: aiConfidence, generated_description: aiGeneratedDescription, severity_score: aiSeverityScore, is_miscategorized } = aiResponse.data);
+      }  catch (aiError) {
+  console.error("AI service error:", aiError.message);  // change this line
+  console.error("AI service full error:", aiError.response?.data || aiError.message);
+}
+    }
+
+    // Upload image to Cloudinary (only if image is provided)
     let imageUrl = null;
     if (req.file) {
-  const result = await cloudinary.uploader.upload(
-    `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`
-  );
-
-  imageUrl = result.secure_url;
-}
+      const result = await cloudinary.uploader.upload(
+        `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`
+      );
+      imageUrl = result.secure_url;
+    }
 
     const issue = await Issue.create({
       title,
@@ -30,7 +47,12 @@ console.log("USER:", req.user);
       category,
       location: { lat: parseFloat(lat), lng: parseFloat(lng) },
       images: imageUrl ? [imageUrl] : [],
-      reportedBy: req.user._id
+      reportedBy: req.user._id,
+      aiCategory,
+      aiConfidence,
+      aiGeneratedDescription,
+      aiSeverityScore,
+      is_miscategorized,
     });
 
     res.status(201).json({

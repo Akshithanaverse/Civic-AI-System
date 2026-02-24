@@ -41,7 +41,12 @@ const issueSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null
-    }
+    },
+    aiCategory: String,
+    aiConfidence: Number,
+    aiGeneratedDescription: String,
+    aiSeverityScore: Number,
+    is_miscategorized: Boolean,
   },
   { timestamps: true }
 );
