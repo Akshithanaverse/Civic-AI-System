@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { getAllIssues, assignIssue, getCrews } from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 export default function AllIssues() {
   const [issues, setIssues] = useState([]);
   const [crews, setCrews] = useState([]);
-  const [selectedIssue, setSelectedIssue] = useState(null);
+  const [assignModalIssue, setAssignModalIssue] = useState(null);
+  const [chosenCrewId, setChosenCrewId] = useState("");
   const token = localStorage.getItem("token");
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -26,104 +29,146 @@ export default function AllIssues() {
     try {
       await assignIssue(issueId, crewId, token);
       alert("Assigned successfully!");
-      // Refresh issues
-      const res = await getAllIssues(token);
-      setIssues(res.data);
+      // update local state so button text changes immediately
+      setIssues((prev) =>
+        prev.map((iss) =>
+          iss._id === issueId ? { ...iss, status: "assigned", assignedTo: crewId } : iss
+        )
+      );
+      setAssignModalIssue(null);
+      setChosenCrewId("");
     } catch (err) {
       console.error(err);
       alert("Failed to assign issue");
     }
   };
 
-  const openModal = (issue) => {
-    setSelectedIssue(issue);
+  // navigation to detail page
+  const openDetail = (issue) => {
+    navigate(`/issues/${issue._id}`);
   };
 
-  const closeModal = () => {
-    setSelectedIssue(null);
+  const statusClasses = (status) => {
+    switch ((status || "").toLowerCase()) {
+      case "pending":
+        return "text-yellow-600 bg-yellow-100";
+      case "assigned":
+        return "text-blue-600 bg-blue-100";
+      case "in progress":
+      case "in_progress":
+        return "text-orange-600 bg-orange-100";
+      case "resolved":
+        return "text-green-600 bg-green-100";
+      case "rejected":
+        return "text-red-600 bg-red-100";
+      default:
+        return "text-slate-600 bg-slate-100";
+    }
+  };
+
+  const openAssignModal = (issue) => {
+    setAssignModalIssue(issue);
+    setChosenCrewId("");
+  };
+
+  const closeAssignModal = () => {
+    setAssignModalIssue(null);
+    setChosenCrewId("");
   };
 
   return (
     <div className="p-8">
       <h1 className="text-3xl font-bold mb-6">All Issues</h1>
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-200">
-            <th className="border p-2">Title</th>
-            <th className="border p-2">Category</th>
-            <th className="border p-2">Status</th>
-            <th className="border p-2">Reported By</th>
-            <th className="border p-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {issues.map((issue) => (
-            <tr key={issue._id} className="hover:bg-gray-100">
-              <td
-                className="border p-2 cursor-pointer hover:underline text-blue-600"
-                onClick={() => openModal(issue)}
-              >
+
+      <div className="grid gap-6">
+        {issues.map((issue) => (
+          <div
+            key={issue._id}
+            onClick={() => openDetail(issue)}
+            className="bg-white rounded-2xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-shadow duration-300"
+          >
+            <div className="flex justify-between items-start mb-3">
+              <h2 className="text-xl font-semibold text-slate-800 truncate">
                 {issue.title}
-              </td>
-              <td className="border p-2">{issue.category}</td>
-              <td className="border p-2">{issue.status}</td>
-              <td className="border p-2">{issue.reportedBy?.name}</td>
-              <td className="border p-2">
-                <select
-                  className="border p-1 mr-2"
-                  id={`crew-${issue._id}`}
-                >
-                  <option value="">Select Crew</option>
-                  {crews.map((crew) => (
-                    <option key={crew._id} value={crew._id}>
-                      {crew.name}
-                    </option>
-                  ))}
-                </select>
+              </h2>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium ${statusClasses(issue.status)}`}
+              >
+                {issue.status}
+              </span>
+            </div>
+            <p className="text-slate-600 text-sm mb-2 truncate">
+              Category: {issue.category}
+            </p>
+            <p className="text-slate-600 text-sm mb-2 truncate">
+              Reported by: {issue.reportedBy?.name}
+            </p>
+            <p className="text-slate-600 text-sm mb-4 truncate">
+              Assigned to: {issue.assignedTo?.name || "—"}
+            </p>
+
+            <div className="flex justify-between items-center">
+              {issue.status?.toLowerCase() === "assigned" ? (
                 <button
-                  className="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                  className="bg-blue-500 text-white px-4 py-2 rounded opacity-70 cursor-not-allowed"
+                  disabled
+                >
+                  Assigned
+                </button>
+              ) : (
+                <button
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const select = document.getElementById(`crew-${issue._id}`);
-                    const crewId = select.value;
-                    if (!crewId) {
-                      alert("Please select a crew");
-                      return;
-                    }
-                    handleAssign(issue._id, crewId);
+                    openAssignModal(issue);
                   }}
                 >
                   Assign
                 </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              )}
+              <span className="text-xs text-slate-400">
+                {new Date(issue.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
 
-      {selectedIssue && (
+      {assignModalIssue && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded shadow-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto relative">
+          <div className="bg-white p-6 rounded shadow-lg w-full max-w-md relative">
             <button
               className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-2xl"
-              onClick={closeModal}
+              onClick={closeAssignModal}
             >
               ×
             </button>
-            <h2 className="text-2xl font-bold mb-4">{selectedIssue.title}</h2>
-            <p><strong>Description:</strong> {selectedIssue.description}</p>
-            <p><strong>Category:</strong> {selectedIssue.category}</p>
-            <p><strong>Status:</strong> {selectedIssue.status}</p>
-            <p><strong>Reported By:</strong> {selectedIssue.reportedBy?.name}</p>
-            <p><strong>Location:</strong> Lat: {selectedIssue.location?.lat}, Lng: {selectedIssue.location?.lng}</p>
-            {selectedIssue.images && selectedIssue.images.length > 0 && (
-              <div>
-                <strong>Images:</strong>
-                {selectedIssue.images.map((img, idx) => (
-                  <img key={idx} src={img} alt="Issue" className="w-full mt-2" />
-                ))}
-              </div>
-            )}
+            <h2 className="text-xl font-bold mb-4">Assign Crew</h2>
+            <p className="mb-2">Issue: <strong>{assignModalIssue.title}</strong></p>
+            <div className="space-y-3 max-h-60 overflow-y-auto mb-4">
+              {crews.map((crew) => (
+                <div key={crew._id} className="flex items-center">
+                  <input
+                    type="radio"
+                    name="crew"
+                    value={crew._id}
+                    checked={chosenCrewId === crew._id}
+                    onChange={() => setChosenCrewId(crew._id)}
+                    className="mr-2"
+                  />
+                  <span>{crew.name}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              disabled={!chosenCrewId}
+              className={`w-full py-2 rounded text-white ${
+                chosenCrewId ? "bg-green-600 hover:bg-green-700" : "bg-gray-300 cursor-not-allowed"
+              }`}
+              onClick={() => handleAssign(assignModalIssue._id, chosenCrewId)}
+            >
+              Confirm Assign
+            </button>
           </div>
         </div>
       )}

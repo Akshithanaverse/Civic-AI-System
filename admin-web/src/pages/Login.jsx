@@ -1,50 +1,169 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { loginAdmin } from "../services/api";
+import { Shield, Mail, Lock, ArrowRight } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
       const res = await loginAdmin(email, password);
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("role", res.data.role);
+      if (res.data.name) localStorage.setItem("userName", res.data.name);
       navigate("/dashboard");
     } catch (err) {
       alert(err.response?.data?.message || "Login failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.4 }
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="p-8 bg-white rounded shadow-md w-96">
-        <h2 className="text-2xl font-bold mb-6 text-center">Admin Login</h2>
-        <form className="flex flex-col gap-4" onSubmit={handleLogin}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="border p-2 rounded"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="border p-2 rounded"
-            required
-          />
-          <button className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
-            Login
-          </button>
-        </form>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800 p-4">
+      <motion.div
+        className="w-full max-w-md"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        {/* Logo and Title */}
+        <motion.div
+          className="text-center mb-8"
+          variants={itemVariants}
+        >
+          <motion.div
+            className="flex justify-center mb-4"
+            whileHover={{ scale: 1.1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Shield size={60} className="text-indigo-400" />
+          </motion.div>
+          <h1 className="text-3xl font-bold text-white mb-2">Admin Portal</h1>
+          <p className="text-slate-300">Secure access to administrative controls</p>
+        </motion.div>
+
+        {/* Login Form */}
+        <motion.div
+          className="backdrop-blur-md bg-white/10 border border-white/20 rounded-3xl p-8 shadow-2xl"
+          variants={itemVariants}
+        >
+          <h2 className="text-2xl font-semibold text-white text-center mb-6">Sign In</h2>
+
+          <form className="space-y-6" onSubmit={handleLogin}>
+            <motion.div
+              variants={itemVariants}
+              whileFocus={{ scale: 1.02 }}
+            >
+              <div className="relative">
+                <Mail size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                <input
+                  type="email"
+                  placeholder="Administrator Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-white/20 border border-white/30 rounded-2xl text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all duration-300"
+                  required
+                />
+              </div>
+            </motion.div>
+
+            <motion.div
+              variants={itemVariants}
+              whileFocus={{ scale: 1.02 }}
+            >
+              <div className="relative">
+                <Lock size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-white/20 border border-white/30 rounded-2xl text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all duration-300"
+                  required
+                />
+              </div>
+            </motion.div>
+
+            <motion.button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-300 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Signing In...
+                </div>
+              ) : (
+                <div className="flex items-center justify-center">
+                  Sign In
+                  <ArrowRight size={20} className="ml-2" />
+                </div>
+              )}
+            </motion.button>
+          </form>
+
+          <motion.div
+            className="mt-6 text-center"
+            variants={itemVariants}
+          >
+            <p className="text-slate-300">
+              Don't have an account?{" "}
+              <Link
+                to="/register"
+                className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors duration-300"
+              >
+                Create one here
+              </Link>
+            </p>
+          </motion.div>
+        </motion.div>
+
+        {/* Back to Home */}
+        <motion.div
+          className="text-center mt-6"
+          variants={itemVariants}
+        >
+          <Link
+            to="/"
+            className="text-slate-400 hover:text-white transition-colors duration-300 text-sm"
+          >
+            ← Back to Home
+          </Link>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
