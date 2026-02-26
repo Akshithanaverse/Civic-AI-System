@@ -1,10 +1,41 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: Arial, sans-serif;
+@import "tailwindcss";
+
+/* Custom styles for Civic-Tech Modernism */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+  }
 }
 
-body {
-  background-color: #f5f7fa;
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-md bg-white/30 border border-white/20 rounded-2xl shadow-xl;
+  }
+
+  .btn-primary {
+  
+  /* ensure leaflet map doesn't cover fixed navbar */
+ .leaflet-pane,
+.leaflet-top,
+.leaflet-bottom  {
+    z-index: 0 !important;
+  }
+    @apply bg-emerald-600 text-white px-6 py-3 rounded-2xl font-semibold hover:bg-emerald-700 transform hover:scale-105 transition-all duration-300 shadow-xl;
+  }
+
+  .btn-secondary {
+    @apply bg-slate-600 text-white px-6 py-3 rounded-2xl font-medium hover:bg-slate-700 transition-colors duration-300;
+  }
 }

@@ -44,18 +44,22 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    // include name in the JWT payload so clients can easily display it
     const token = jwt.sign(
       {
         id: user._id,
-        role: user.role
+        role: user.role,
+        name: user.name
       },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
+    // return both token and user info; name is optional but convenient
     res.status(200).json({
       token,
-      role: user.role
+      role: user.role,
+      name: user.name
     });
   } catch (error) {
     next(error);
