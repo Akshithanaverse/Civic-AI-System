@@ -360,6 +360,148 @@ def training_stats():
 def health():
     return jsonify({"status": "AI Service is running", "version": "2.0"}), 200
 
+@app.route("/rag-suggest", methods=["POST"])
+def rag_suggest():
+    """
+    RAG endpoint for crew resolution suggestions.
+    Receives current issue + similar resolved issues from backend.
+    Generates step-by-step resolution guide using Gemini.
+    """
+    from nlp_module import generate_description
+    import google.generativeai as genai
+    gemini = genai.GenerativeModel("gemini-2.5-flash")
+
+    data = request.json
+    current_issue = data.get("current_issue", {})
+    similar_issues = data.get("similar_issues", [])
+
+    if not current_issue:
+        return jsonify({"error": "current_issue required"}), 400
+
+    try:
+        context = ""
+        if similar_issues:
+            context = "PAST RESOLVED SIMILAR ISSUES:\n"
+            for i, issue in enumerate(similar_issues, 1):
+                context += f"""
+Issue {i}:
+- Title: {issue.get('title', 'N/A')}
+- Category: {issue.get('category', 'N/A')}
+- Description: {issue.get('description', 'N/A')}
+- How it was resolved: {issue.get('resolution_comment', 'Resolved successfully')}
+"""
+
+        prompt = f"""You are an expert municipal crew supervisor with years of field experience.
+
+{context}
+
+CURRENT ISSUE TO RESOLVE:
+- Title: {current_issue.get('title', 'N/A')}
+- Category: {current_issue.get('category', 'N/A')}
+- Description: {current_issue.get('description', 'N/A')}
+- Urgency: {current_issue.get('urgencyLabel', 'Medium')}
+
+Based on the past resolved issues above and your expertise, provide a clear resolution guide.
+
+Reply in this EXACT format:
+SUMMARY: <one sentence describing the fix approach>
+STEPS:
+1. <first action>
+2. <second action>
+3. <third action>
+4. <fourth action if needed>
+MATERIALS: <comma separated list of materials needed>
+ESTIMATED_TIME: <realistic time estimate e.g. "2-4 hours">
+SAFETY_NOTE: <one important safety precaution>
+
+Nothing else. Be specific and practical."""
+
+        response = gemini.generate_content(prompt)
+        result = response.text.strip()
+
+        suggestion = {
+            "summary": "", "steps": [], "materials": [],
+            "estimated_time": "", "safety_note": "",
+            "based_on": len(similar_issues)
+        }
+
+        current_section = None
+        for line in result.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("SUMMARY:"):
+                suggestion["summary"] = line.replace("SUMMARY:", "").strip()
+            elif line.startswith("STEPS:"):
+                current_section = "steps"
+            elif line.startswith("MATERIALS:"):
+                current_section = None
+                suggestion["materials"] = [m.strip() for m in line.replace("MATERIALS:", "").strip().split(",")]
+            elif line.startswith("ESTIMATED_TIME:"):
+                current_section = None
+                suggestion["estimated_time"] = line.replace("ESTIMATED_TIME:", "").strip()
+            elif line.startswith("SAFETY_NOTE:"):
+                current_section = None
+                suggestion["safety_note"] = line.replace("SAFETY_NOTE:", "").strip()
+            elif current_section == "steps" and line and line[0].isdigit():
+                step = line.split(".", 1)[-1].strip() if "." in line else line[2:].strip()
+                suggestion["steps"].append(step)
+
+        return jsonify(suggestion)
+
+    except Exception as e:
+        print(f"RAG suggest error: {e}")
+        return jsonify({"error": str(e)}), 500
+    
+    # Add this endpoint to ai-services/app.py (before the if __name__ == "__main__" block)
+
+# REPLACE the existing /rag-describe route in app.py with this:
+
+@app.route("/rag-describe", methods=["POST"])
+def rag_describe():
+    import google.generativeai as genai
+    gemini = genai.GenerativeModel("gemini-2.5-flash")
+
+    data        = request.json
+    description = data.get("description", "").strip()
+    category    = data.get("category", "General")
+
+    if not description or len(description) < 10:
+        return jsonify({"suggestion": None}), 200
+
+    try:
+        prompt = f"""You are helping a citizen write a better civic issue report for municipal workers.
+
+CITIZEN'S DESCRIPTION:
+"{description}"
+
+CATEGORY: {category}
+
+Rewrite this into a clear, specific, actionable 2-3 sentence report.
+- Keep the same facts, don't invent new ones
+- Use plain language
+- Make it easy for a municipal worker to understand the exact problem
+
+Return ONLY the rewritten description. No preamble, no quotes, no explanation."""
+
+        response  = gemini.generate_content(prompt)
+        suggestion = response.text.strip().strip('"').strip("'").strip()
+
+        # FIX: only reject if suggestion is basically empty or identical word-for-word
+        if not suggestion or suggestion.lower() == description.lower():
+            return jsonify({"suggestion": None}), 200
+
+        return jsonify({"suggestion": suggestion})
+
+    except Exception as e:
+        print(f"RAG describe error: {e}")
+        return jsonify({"suggestion": None}), 200
 
 if __name__ == "__main__":
     app.run(port=8000, debug=True)
+
+
+# ──────────────────────────────────────────────
+# RAG ENDPOINT: Resolution suggestion for crew
+# ──────────────────────────────────────────────
+
