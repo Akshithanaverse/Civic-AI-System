@@ -336,17 +336,42 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
     const { image, description } = req.body;
 
     if (!image) {
+      console.log("[BACKEND] No image provided");
       return res.status(400).json({ error: "Image is required" });
     }
 
+    console.log(`[BACKEND] Received image analysis request. Image size: ${image.length} chars, description: ${description ? 'yes' : 'no'}`);
+    console.log(`[BACKEND] Calling AI service at ${AI_SERVICE_URL}/analyze-and-enhance`);
+
+    const startTime = Date.now();
     const aiResponse = await axios.post(`${AI_SERVICE_URL}/analyze-and-enhance`, {
       image,
       description: description || ""
+    }, {
+      timeout: 60000  // 60 seconds timeout
     });
+    const endTime = Date.now();
+
+    console.log(`[BACKEND] AI service responded in ${endTime - startTime}ms`);
+    console.log(`[BACKEND] Response status: ${aiResponse.status}`);
 
     res.status(200).json(aiResponse.data);
   } catch (error) {
-    console.error("AI analyze-and-enhance error:", error.message);
-    res.status(500).json({ error: "Failed to analyze image" });
+    const errorTime = Date.now();
+    console.error("[BACKEND] AI analyze-and-enhance error:", {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      data: error.response?.data,
+      stack: error.stack
+    });
+
+    if (error.code === 'ECONNABORTED') {
+      res.status(504).json({ error: "AI analysis timed out" });
+    } else if (error.response) {
+      res.status(error.response.status).json({ error: error.response.data });
+    } else {
+      res.status(500).json({ error: "Failed to analyze image" });
+    }
   }
 };
