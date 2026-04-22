@@ -356,7 +356,7 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
       image,
       description: description || ""
     }, {
-      timeout: 45000  // 45 seconds timeout
+      timeout: 20000  // 20 seconds - should be fast with fallback
     });
     const endTime = Date.now();
 

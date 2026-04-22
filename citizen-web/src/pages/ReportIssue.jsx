@@ -337,16 +337,8 @@ function ReportIssue() {
   } catch (err) {
     console.error("❌ AI analysis failed:", err.message);
     console.error("❌ Error details:", err.response?.data || err);
-    // Show error to user
-    if (err.code === 'ECONNABORTED') {
-      alert("AI analysis timed out. Please try again or submit without AI analysis.");
-    } else if (err.response?.status === 404) {
-      alert("AI service endpoint not found. Please check the service URL.");
-    } else if (err.response?.status === 500) {
-      alert("AI service error. Please try again or submit without AI analysis.");
-    } else {
-      alert("AI analysis failed. You can still submit the issue manually.");
-    }
+    // Don't alert - just let user continue without AI
+    console.warn("⚠️ AI analysis unavailable. User can still submit without AI suggestions.");
   } finally {
     setAiLoading(false);
   }
@@ -374,7 +366,12 @@ function ReportIssue() {
     setImagePreviews(newPreviews);
     setIsCompressing(false);
     e.target.value = "";
-    if (firstNewFile && images.length === 0) runAIAnalysis(firstNewFile, formData.description);
+    if (firstNewFile && images.length === 0) {
+      // Run AI analysis in background (non-blocking)
+      runAIAnalysis(firstNewFile, formData.description).catch(err => {
+        console.log("AI analysis failed (non-critical):", err.message);
+      });
+    }
   };
 
   const removeImage = (index) => {

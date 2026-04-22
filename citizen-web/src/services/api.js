@@ -76,7 +76,7 @@ export const analyzeImage = async (imageBase64, description = "", testMode = fal
   if (testMode) params.test = 'true';
   if (fastMode) params.fast = 'true';
   return API.post("/issues/analyze-image", { image: imageBase64, description }, { 
-    timeout: 50000,
+    timeout: 15000,  // 15 seconds - backend has fallback, should respond quickly
     params
   });
 };

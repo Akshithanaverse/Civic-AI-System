@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from cv_module import classify_image, calculate_severity, scale_confidence
 from nlp_module import generate_description, analyze_text_comprehensive, classify_text, summarize_text, detect_urgency
+from simple_classifier import classify_by_keywords, get_description_by_category
 import base64
 import os
 import json
@@ -155,95 +156,116 @@ def detect_urgency_endpoint():
 @app.route("/analyze-and-enhance", methods=["POST"])
 def analyze_and_enhance():
     """
-    Combined endpoint:
-    1. Runs CV on the uploaded image → detects category
-    2. Runs NLP to generate a rich enhanced description for that category
-    3. Returns category, confidence, enhanced_description, severity, urgency hint
+    FAST endpoint for image analysis - optimized for Render free tier.
+    Uses YOLO only (skips slow Gemini).
+    Falls back to keyword classification if needed.
     
-    Frontend uses this to auto-fill the form fields after image upload.
+    NO TIMEOUTS - returns response immediately.
     """
-    # Check for test mode (fast mock response for testing)
-    test_mode = request.args.get('test', 'false').lower() == 'true' or request.headers.get('X-Test-Mode', 'false').lower() == 'true'
-    fast_mode = request.args.get('fast', 'false').lower() == 'true' or request.headers.get('X-Fast-Mode', 'false').lower() == 'true'
+    # Check for modes
+    test_mode = request.args.get('test', 'false').lower() == 'true'
     
     if test_mode:
         print("[TEST MODE] Returning mock AI analysis response")
         return jsonify({
             "predicted_category": "Pothole",
             "confidence_percent": 85.0,
-            "enhanced_description": "[Pothole Issue – High Urgency] A significant pothole has been detected in the road surface, posing a safety hazard to vehicles and pedestrians. Immediate repair is needed to prevent accidents and further damage.",
+            "enhanced_description": "[Pothole Issue – High Urgency] A significant pothole has been detected.",
             "severity_score": 4,
             "is_miscategorized": False,
-            "urgency": {
-                "level": 3,
-                "label": "High",
-                "keywords": ["pothole", "safety", "hazard"]
-            },
-            "ai_suggested": True
+            "urgency": {"level": 3, "label": "High", "keywords": ["pothole"]},
+            "ai_suggested": True,
+            "method": "test_mode"
         })
     
     data = request.json
     image_base64 = data.get("image")
-    user_description = data.get("description", "").strip()  # optional existing text
+    user_description = data.get("description", "").strip()
 
     if not image_base64:
         return jsonify({"error": "Image required"}), 400
 
     try:
-        # Decode image
+        # Step 1: Decode image
         try:
             image_bytes = base64.b64decode(image_base64)
             print(f"[ANALYZE] Image decoded: {len(image_bytes)} bytes")
         except Exception as decode_err:
             print(f"[ERROR] Base64 decode failed: {decode_err}")
+            # Fallback to keyword classification
+            if user_description:
+                category, confidence, method = classify_by_keywords(user_description)
+                return jsonify({
+                    "predicted_category": category,
+                    "confidence_percent": confidence,
+                    "enhanced_description": get_description_by_category(category),
+                    "severity_score": 2,
+                    "is_miscategorized": confidence < 50,
+                    "urgency": {"level": 2, "label": "Medium", "keywords": []},
+                    "ai_suggested": False,
+                    "method": "keyword_fallback (decode_error)"
+                })
             return jsonify({"error": "Invalid image format"}), 400
 
-        # Step 1: CV - detect category from image
-        print(f"[ANALYZE] Classifying image...")
-        category, raw_confidence = classify_image(image_bytes, fast_mode=fast_mode)
-        print(f"[ANALYZE] Classification result: {category} ({raw_confidence:.2%})")
-        
-        confidence_percent = scale_confidence(raw_confidence)
-        severity = calculate_severity(category, confidence_percent, image_bytes)
-        is_miscategorized = confidence_percent < 50
-        
-        print(f"[ANALYZE] Confidence: {confidence_percent:.2%}, Severity: {severity}")
+        # Step 2: Try YOLO classification (FAST, no API calls)
+        print(f"[ANALYZE] Running YOLO (fast, local detection)...")
+        try:
+            from cv_module.vision import _classify_with_yolo
+            from PIL import Image
+            import io
+            image = Image.open(io.BytesIO(image_bytes))
+            category, raw_confidence = _classify_with_yolo(image)
+            print(f"[ANALYZE] YOLO result: {category} ({raw_confidence:.2%})")
+            
+            # If YOLO found something, use it immediately
+            if category != "Uncategorized" and raw_confidence > 0.5:
+                confidence_percent = raw_confidence * 100
+                desc = get_description_by_category(category) if user_description else f"[{category}] {user_description or 'Issue detected'}"
+                return jsonify({
+                    "predicted_category": category,
+                    "confidence_percent": min(100, confidence_percent),
+                    "enhanced_description": desc,
+                    "severity_score": min(5, int(confidence_percent / 20)),
+                    "is_miscategorized": False,
+                    "urgency": {"level": 3, "label": "High", "keywords": []},
+                    "ai_suggested": True,
+                    "method": "yolo_fast"
+                })
+        except Exception as yolo_err:
+            print(f"[WARN] YOLO error: {yolo_err}")
 
-        # Step 2: NLP - build enhanced description
-        # If user already typed something, enhance that; otherwise generate from category
-        if user_description and len(user_description) >= 10:
-            # Enhance the user's own description
-            text_analysis = analyze_text_comprehensive(user_description)
-            enhanced_description = _build_enhanced_description(
-                category, confidence_percent, user_description, text_analysis
-            )
-            urgency = text_analysis.get("urgency", {})
-        else:
-            # Generate from scratch based on detected category
-            base_description = generate_description(category)
-            enhanced_description = base_description
-            urgency_level, urgency_label, keywords = detect_urgency(base_description)
-            urgency = {
-                "level": urgency_level,
-                "label": urgency_label,
-                "keywords": keywords
-            }
-
+        # Step 3: If YOLO didn't work, fallback to KEYWORD classification (super fast)
+        print(f"[ANALYZE] YOLO inconclusive, using keyword fallback...")
+        category, confidence, method = classify_by_keywords(user_description)
+        
         return jsonify({
             "predicted_category": category,
-            "confidence_percent": confidence_percent,
-            "enhanced_description": enhanced_description,
-            "severity_score": severity,
-            "is_miscategorized": is_miscategorized,
-            "urgency": urgency,
-            "ai_suggested": True   # flag so frontend can show "AI Suggested" badge
+            "confidence_percent": confidence,
+            "enhanced_description": get_description_by_category(category),
+            "severity_score": min(5, max(1, int(confidence / 25))),
+            "is_miscategorized": confidence < 50,
+            "urgency": {"level": 2 if confidence > 70 else 1, "label": "Medium" if confidence > 70 else "Low", "keywords": []},
+            "ai_suggested": False,
+            "method": "keyword_fallback"
         })
 
     except Exception as e:
         import traceback
         print(f"[ERROR] analyze-and-enhance error: {e}")
         traceback.print_exc()
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+        
+        # Ultimate fallback - return basic response
+        return jsonify({
+            "predicted_category": "Uncategorized",
+            "confidence_percent": 0,
+            "enhanced_description": "Issue reported. Please check manually.",
+            "severity_score": 2,
+            "is_miscategorized": True,
+            "urgency": {"level": 1, "label": "Low", "keywords": []},
+            "ai_suggested": False,
+            "method": "error_fallback",
+            "error": str(e)
+        })
 
 
 def _build_enhanced_description(category, confidence, user_text, text_analysis):
