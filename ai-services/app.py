@@ -162,6 +162,26 @@ def analyze_and_enhance():
     
     Frontend uses this to auto-fill the form fields after image upload.
     """
+    # Check for test mode (fast mock response for testing)
+    test_mode = request.args.get('test', 'false').lower() == 'true' or request.headers.get('X-Test-Mode', 'false').lower() == 'true'
+    fast_mode = request.args.get('fast', 'false').lower() == 'true' or request.headers.get('X-Fast-Mode', 'false').lower() == 'true'
+    
+    if test_mode:
+        print("[TEST MODE] Returning mock AI analysis response")
+        return jsonify({
+            "predicted_category": "Pothole",
+            "confidence_percent": 85.0,
+            "enhanced_description": "[Pothole Issue – High Urgency] A significant pothole has been detected in the road surface, posing a safety hazard to vehicles and pedestrians. Immediate repair is needed to prevent accidents and further damage.",
+            "severity_score": 4,
+            "is_miscategorized": False,
+            "urgency": {
+                "level": 3,
+                "label": "High",
+                "keywords": ["pothole", "safety", "hazard"]
+            },
+            "ai_suggested": True
+        })
+    
     data = request.json
     image_base64 = data.get("image")
     user_description = data.get("description", "").strip()  # optional existing text
@@ -180,7 +200,7 @@ def analyze_and_enhance():
 
         # Step 1: CV - detect category from image
         print(f"[ANALYZE] Classifying image...")
-        category, raw_confidence = classify_image(image_bytes)
+        category, raw_confidence = classify_image(image_bytes, fast_mode=fast_mode)
         print(f"[ANALYZE] Classification result: {category} ({raw_confidence:.2%})")
         
         confidence_percent = scale_confidence(raw_confidence)
@@ -510,7 +530,14 @@ SAFETY_NOTE: <one important safety precaution>
 
 Nothing else. Be specific and practical."""
 
-        response = gemini.generate_content(prompt)
+        response = gemini.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=500,
+            ),
+            request_options={"timeout": 30}
+        )
         result = response.text.strip()
 
         suggestion = {

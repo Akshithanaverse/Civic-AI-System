@@ -334,21 +334,29 @@ export const getAssignedIssues = async (req, res, next) => {
 export const analyzeImageAndEnhance = async (req, res, next) => {
   try {
     const { image, description } = req.body;
+    const testMode = req.query.test === 'true' || req.headers['x-test-mode'] === 'true';
+    const fastMode = req.query.fast === 'true' || req.headers['x-fast-mode'] === 'true';
 
     if (!image) {
       console.log("[BACKEND] No image provided");
       return res.status(400).json({ error: "Image is required" });
     }
 
-    console.log(`[BACKEND] Received image analysis request. Image size: ${image.length} chars, description: ${description ? 'yes' : 'no'}`);
+    console.log(`[BACKEND] Received image analysis request. Image size: ${image.length} chars, description: ${description ? 'yes' : 'no'}, testMode: ${testMode}, fastMode: ${fastMode}`);
     console.log(`[BACKEND] Calling AI service at ${AI_SERVICE_URL}/analyze-and-enhance`);
 
     const startTime = Date.now();
-    const aiResponse = await axios.post(`${AI_SERVICE_URL}/analyze-and-enhance`, {
+    let url = `${AI_SERVICE_URL}/analyze-and-enhance`;
+    const params = [];
+    if (testMode) params.push('test=true');
+    if (fastMode) params.push('fast=true');
+    if (params.length > 0) url += '?' + params.join('&');
+    
+    const aiResponse = await axios.post(url, {
       image,
       description: description || ""
     }, {
-      timeout: 60000  // 60 seconds timeout
+      timeout: 45000  // 45 seconds timeout
     });
     const endTime = Date.now();
 

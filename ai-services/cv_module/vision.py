@@ -51,11 +51,11 @@ except Exception as e:
 # MAIN CLASSIFICATION FUNCTION
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def classify_image(image_bytes):
+def classify_image(image_bytes, fast_mode=False):
     """
     Two-stage classification:
     1. YOLO  — fast local detection
-    2. Gemini Vision — smart fallback
+    2. Gemini Vision — smart fallback (skipped in fast mode)
     Returns: (category, confidence) where category is one of CIVIC_CATEGORIES
     """
     if not image_bytes:
@@ -72,7 +72,7 @@ def classify_image(image_bytes):
 
     # ── Stage 1: YOLO ──
     category, confidence = _classify_with_yolo(image)
-    if category != "Uncategorized":
+    if category != "Uncategorized" or fast_mode:
         return category, confidence
 
     # ── Stage 2: Gemini Vision ──
@@ -173,7 +173,12 @@ REASON: [one short sentence explaining your choice]"""
                     "mime_type": "image/jpeg",
                     "data": image_base64,
                 }
-            ]
+            ],
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=200,
+            ),
+            request_options={"timeout": 30}  # 30 second timeout
         )
         
         result = response.text.strip()

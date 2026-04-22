@@ -71,6 +71,12 @@ export const markLogsAsViewed = (issueId) => {
 };
 
 // Analyze image for auto-fill
-export const analyzeImage = async (imageBase64, description = "") => {
-  return API.post("/issues/analyze-image", { image: imageBase64, description });
+export const analyzeImage = async (imageBase64, description = "", testMode = false, fastMode = false) => {
+  const params = {};
+  if (testMode) params.test = 'true';
+  if (fastMode) params.fast = 'true';
+  return API.post("/issues/analyze-image", { image: imageBase64, description }, { 
+    timeout: 50000,
+    params
+  });
 };

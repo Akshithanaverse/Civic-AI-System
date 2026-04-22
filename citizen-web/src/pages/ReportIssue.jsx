@@ -196,6 +196,8 @@ function ReportIssue() {
   const [aiLoading, setAiLoading]   = useState(false);
   const [aiResult, setAiResult]     = useState(null);
   const [aiApplied, setAiApplied]   = useState({ category: false, description: false });
+  const [testMode, setTestMode]     = useState(false);  // For testing with mock AI responses
+  const [fastMode, setFastMode]     = useState(false);  // For faster AI processing (skip Gemini)
 
   // RAG state — FIX: separate loading from suggestion so they don't interfere
   const [ragLoading, setRagLoading]       = useState(false);
@@ -209,6 +211,17 @@ function ReportIssue() {
 
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+
+  // Check for test mode in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('test') === 'true') {
+      setTestMode(true);
+    }
+    if (urlParams.get('fast') === 'true') {
+      setFastMode(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -295,7 +308,7 @@ function ReportIssue() {
     console.log("📤 Sending to backend API for AI analysis...");
     
     // Add timeout to prevent hanging
-    const response = await analyzeImage(base64, currentDescription || "");
+    const response = await analyzeImage(base64, currentDescription || "", testMode, fastMode);
 
     console.log("✅ AI response received:", response.data);
 
@@ -349,7 +362,7 @@ function ReportIssue() {
     let firstNewFile = null;
     for (const file of files) {
       try {
-        const compressed = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 1280, useWebWorker: true });
+        const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true });
         if (!firstNewFile) firstNewFile = compressed;
         newImages.push(compressed);
         const reader = new FileReader();
@@ -602,6 +615,36 @@ function ReportIssue() {
               </div>
 
               {aiResult && <AIAnalysisPanel aiResult={aiResult} onDismiss={() => setAiResult(null)} />}
+
+              {/* Test Mode Toggle - For development testing */}
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="testMode"
+                  checked={testMode}
+                  onChange={(e) => setTestMode(e.target.checked)}
+                  className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                />
+                <label htmlFor="testMode" className="text-sm text-amber-700 font-medium">
+                  Enable Test Mode (Fast AI responses)
+                </label>
+                <span className="text-xs text-amber-600">For development only</span>
+              </div>
+
+              {/* Fast Mode Toggle - Skip Gemini for faster processing */}
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="fastMode"
+                  checked={fastMode}
+                  onChange={(e) => setFastMode(e.target.checked)}
+                  className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="fastMode" className="text-sm text-blue-700 font-medium">
+                  Enable Fast Mode (Skip advanced AI analysis)
+                </label>
+                <span className="text-xs text-blue-600">Uses only basic detection</span>
+              </div>
             </div>
           </div>
 
