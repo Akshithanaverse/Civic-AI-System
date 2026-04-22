@@ -69,3 +69,8 @@ export const getIssueDetail = (issueId) => {
 export const markLogsAsViewed = (issueId) => {
   return API.put(`/issues/${issueId}/logs/viewed`, {});
 };
+
+// Analyze image for auto-fill
+export const analyzeImage = async (imageBase64, description = "") => {
+  return API.post("/issues/analyze-image", { image: imageBase64, description });
+};

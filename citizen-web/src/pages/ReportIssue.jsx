@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import axios from "axios";
+import { analyzeImage } from "../services/api.js";
 import {
   Upload, MapPin, AlertCircle, Trash2, Search, X, Camera,
   Loader2, Sparkles, CheckCircle2, AlertTriangle, Bot, Lightbulb
@@ -18,9 +19,7 @@ L.Icon.Default.mergeOptions({
 });
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || `http://${window.location.hostname}:8000`;
 
-console.log("🔍 AI Service URL:", AI_SERVICE_URL);
 console.log("🔍 API Base URL:", API_BASE_URL);
 
 const URGENCY_COLORS = {
@@ -293,13 +292,10 @@ function ReportIssue() {
       reader.onerror = reject;
     });
 
-    console.log("📤 Sending to AI service:", `${AI_SERVICE_URL}/analyze-and-enhance`);
+    console.log("📤 Sending to backend API for AI analysis...");
     
     // Add timeout to prevent hanging
-    const response = await axios.post(`${AI_SERVICE_URL}/analyze-and-enhance`, {
-      image: base64,
-      description: currentDescription || ""
-    }, { timeout: 30000 }); // 30 second timeout
+    const response = await analyzeImage(base64, currentDescription || "");
 
     console.log("✅ AI response received:", response.data);
 

@@ -327,3 +327,26 @@ export const getAssignedIssues = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Analyze image and enhance description for citizen form auto-fill
+ */
+export const analyzeImageAndEnhance = async (req, res, next) => {
+  try {
+    const { image, description } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ error: "Image is required" });
+    }
+
+    const aiResponse = await axios.post(`${AI_SERVICE_URL}/analyze-and-enhance`, {
+      image,
+      description: description || ""
+    });
+
+    res.status(200).json(aiResponse.data);
+  } catch (error) {
+    console.error("AI analyze-and-enhance error:", error.message);
+    res.status(500).json({ error: "Failed to analyze image" });
+  }
+};

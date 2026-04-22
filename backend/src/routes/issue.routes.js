@@ -7,7 +7,8 @@ import {
   updateIssueStatus,
   getMyIssues,
   getIssueDetail,
-  markLogsAsViewed
+  markLogsAsViewed,
+  analyzeImageAndEnhance
 } from "../controllers/issue.controller.js";
 import { getResolutionSuggestion } from "../controllers/rag.controller.js";
 import { protect, authorizeRoles } from "../middleware/auth.middleware.js";
@@ -28,6 +29,9 @@ router.post(
 );
 
 router.get("/my", protect, getMyIssues);
+
+// Analyze image for auto-fill
+router.post("/analyze-image", protect, analyzeImageAndEnhance);
 
 router.get(
   "/assigned",
