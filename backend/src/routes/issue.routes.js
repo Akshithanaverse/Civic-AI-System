@@ -8,12 +8,12 @@ import {
   getMyIssues,
   getIssueDetail,
   markLogsAsViewed,
-  analyzeImageAndEnhance,
-  enhanceDescription
+  analyzeImageAndEnhance
 } from "../controllers/issue.controller.js";
 import { getResolutionSuggestion } from "../controllers/rag.controller.js";
 import { protect, authorizeRoles } from "../middleware/auth.middleware.js";
 import multer from "multer";
+
 
 const router = express.Router();
 
@@ -33,7 +33,6 @@ router.get("/my", protect, getMyIssues);
 
 // Analyze image for auto-fill
 router.post("/analyze-image", protect, analyzeImageAndEnhance);
-router.post("/enhance-description", protect, enhanceDescription);
 
 router.get(
   "/assigned",

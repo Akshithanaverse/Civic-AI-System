@@ -3,7 +3,7 @@ import cloudinary from "../config/cloudinary.js";
 import User from "../models/User.model.js";
 import axios from "axios";
 
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://127.0.0.1:8000";
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://127.0.0.1:8000";;
 
 /**
  * Citizen creates an issue (with optional image)
@@ -92,10 +92,11 @@ export const createIssue = async (req, res, next) => {
     });
 
     // ── Save training data (fire-and-forget, non-blocking) ──
+    // Runs AFTER the issue is created so it never delays the response
     if (req.files && req.files.length > 0) {
       _saveTrainingDataAsync({
         imageBuffer: req.files[0].buffer,
-        confirmedCategory: category,
+        confirmedCategory: category,        // what citizen (possibly edited) submitted
         aiCategory: aiCategory || "Uncategorized",
         confidence: aiConfidence || 0,
         issueId: issue._id.toString()
@@ -113,6 +114,7 @@ export const createIssue = async (req, res, next) => {
 
 /**
  * Fire-and-forget: saves the first image as a training sample.
+ * Never throws - errors are just logged so they don't affect the user.
  */
 async function _saveTrainingDataAsync({ imageBuffer, confirmedCategory, aiCategory, confidence, issueId }) {
   try {
@@ -125,6 +127,7 @@ async function _saveTrainingDataAsync({ imageBuffer, confirmedCategory, aiCatego
     });
     console.log(`✓ Training data saved for issue ${issueId} [${confirmedCategory}]`);
   } catch (err) {
+    // Non-fatal - log and move on
     console.warn(`⚠ Training data save failed for issue ${issueId}:`, err.message);
   }
 }
@@ -150,40 +153,6 @@ export const getAllIssues = async (req, res, next) => {
     res.status(200).json(issues);
   } catch (error) {
     next(error);
-  }
-};
-
-/**
- * Enhance description using RAG (for citizen form auto-fill)
- */
-export const enhanceDescription = async (req, res, next) => {
-  try {
-    const { description, category } = req.body;
-
-    if (!description || description.length < 10) {
-      return res.status(200).json({ suggestion: null });
-    }
-
-    console.log(`[BACKEND] RAG enhance request: ${description.substring(0, 50)}...`);
-    console.log(`[BACKEND] Calling AI service at ${AI_SERVICE_URL}/rag-describe`);
-
-    const aiResponse = await axios.post(
-      `${AI_SERVICE_URL}/rag-describe`,
-      {
-        description,
-        category: category || "General"
-      },
-      {
-        timeout: 180000
-      }
-    );
-
-    console.log(`[BACKEND] RAG response:`, aiResponse.data);
-    res.status(200).json(aiResponse.data);
-
-  } catch (error) {
-    console.error("[BACKEND] RAG enhance error:", error.message);
-    res.status(200).json({ suggestion: null });
   }
 };
 
@@ -382,29 +351,53 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
     if (testMode) params.push('test=true');
     if (fastMode) params.push('fast=true');
     if (params.length > 0) url += '?' + params.join('&');
-
+    
     const aiResponse = await axios.post(url, {
       image,
       description: description || ""
     }, {
-      timeout: 180000
+      timeout: 180000  // 3 minutes - HF spaces need time to spin up
     });
     const endTime = Date.now();
 
     console.log(`[BACKEND] AI service responded in ${endTime - startTime}ms`);
     console.log(`[BACKEND] Response status: ${aiResponse.status}`);
+    console.log(`[BACKEND] Response data keys:`, Object.keys(aiResponse.data));
     console.log(`[BACKEND] Full response data:`, JSON.stringify(aiResponse.data, null, 2));
 
     res.status(200).json(aiResponse.data);
 
+    /*
+    // TEMP: Return mock successful response to test UI
+    const mockResponse = {
+      predicted_category: "Pothole",
+      confidence_percent: 85.5,
+      enhanced_description: "A pothole has been detected on the road surface. This represents a significant safety hazard for vehicles and pedestrians. Immediate repair is recommended to prevent accidents and further damage to vehicles.",
+      severity_score: 4,
+      is_miscategorized: false,
+      urgency: {
+        level: 3,
+        label: "High",
+        keywords: ["safety", "hazard", "repair"]
+      },
+      ai_suggested: true
+    };
+
+    console.log(`[BACKEND] Returning mock AI response`);
+    res.status(200).json(mockResponse);
+    */
   } catch (error) {
+    const errorTime = Date.now();
     console.error("[BACKEND] AI analyze-and-enhance error:", {
       message: error.message,
       code: error.code,
       status: error.response?.status,
-      data: error.response?.data
+      data: error.response?.data,
+      stack: error.stack
     });
 
+    // FALLBACK: If AI service fails, return a basic response so the form still works
+    // User can still submit manually
     console.log("[BACKEND] Returning fallback response due to AI service error");
     return res.status(200).json({
       predicted_category: "Uncategorized",
@@ -418,4 +411,5 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
       error_reason: error.message
     });
   }
+  
 };

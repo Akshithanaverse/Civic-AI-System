@@ -19,8 +19,7 @@ L.Icon.Default.mergeOptions({
 });
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-// const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || "https://aknaverse-civic-ai-service.hf.space";
-
+const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || "http://localhost:5000/api"; // Proxy through backend for CORS and unified API
 
 console.log("🔍 API Base URL:", API_BASE_URL);
 
@@ -255,7 +254,7 @@ function ReportIssue() {
       const thisRequest = ++ragRequestId.current;
       setRagLoading(true);
       try {
-        const res = await axios.post(`${API_BASE_URL}/issues/enhance-description`, {
+        const res = await axios.post(`${AI_SERVICE_URL}/rag-describe`, {
           description,
           category: category || "General"
         });
