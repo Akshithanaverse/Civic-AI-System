@@ -362,6 +362,8 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
 
     console.log(`[BACKEND] AI service responded in ${endTime - startTime}ms`);
     console.log(`[BACKEND] Response status: ${aiResponse.status}`);
+    console.log(`[BACKEND] Response data keys:`, Object.keys(aiResponse.data));
+    console.log(`[BACKEND] Full response data:`, JSON.stringify(aiResponse.data, null, 2));
 
     res.status(200).json(aiResponse.data);
 
