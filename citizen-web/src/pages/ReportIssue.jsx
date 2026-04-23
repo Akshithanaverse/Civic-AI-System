@@ -19,6 +19,8 @@ L.Icon.Default.mergeOptions({
 });
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || "https://aknaverse-civic-ai-service.hf.space";
+
 
 console.log("🔍 API Base URL:", API_BASE_URL);
 
