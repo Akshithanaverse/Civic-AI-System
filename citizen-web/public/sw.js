@@ -1,4 +1,4 @@
-const CACHE_NAME = 'civic-ai-citizen-v1';
+const CACHE_NAME = 'civic-ai-citizen-v2'; // Updated version to force cache refresh
 const URLS_TO_CACHE = ['/', '/index.html', '/Citizen app logo.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
@@ -16,15 +16,31 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
+  // Skip caching for data URLs (blob:, data:) and API calls
+  if (event.request.url.startsWith('data:') ||
+      event.request.url.startsWith('blob:') ||
+      event.request.url.includes('/api/') ||
+      event.request.method !== 'GET') {
+    return; // Don't cache, let it go to network
+  }
+
   event.respondWith(
     caches.match(event.request).then(response => {
       return response || fetch(event.request).then(networkResponse => {
-        return caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, networkResponse.clone());
-          return networkResponse;
-        });
+        // Only cache successful GET requests for static assets
+        if (networkResponse.ok && networkResponse.type === 'basic') {
+          return caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          });
+        }
+        return networkResponse;
       });
-    }).catch(() => caches.match('/index.html'))
+    }).catch(() => {
+      // Fallback for offline - only return cached index.html for navigation requests
+      if (event.request.mode === 'navigate') {
+        return caches.match('/index.html');
+      }
+    })
   );
 });

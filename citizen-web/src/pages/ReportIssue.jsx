@@ -354,18 +354,45 @@ function ReportIssue() {
     let firstNewFile = null;
     for (const file of files) {
       try {
-        const compressed = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true });
+        const compressed = await imageCompression(file, {
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: 1024,
+          useWebWorker: true,
+          // Add mobile-specific options
+          preserveExif: false,
+          alwaysKeepResolution: false
+        });
         if (!firstNewFile) firstNewFile = compressed;
         newImages.push(compressed);
+
+        // Enhanced mobile-compatible image preview generation
         const reader = new FileReader();
         reader.readAsDataURL(compressed);
-        await new Promise((resolve) => { reader.onloadend = () => { newPreviews.push(reader.result); resolve(); }; });
-      } catch (error) { console.error("Compression Error:", error); }
+
+        await new Promise((resolve, reject) => {
+          reader.onloadend = () => {
+            // Ensure the data URL is valid and complete
+            const result = reader.result;
+            if (result && typeof result === 'string' && result.startsWith('data:image/')) {
+              newPreviews.push(result);
+              resolve();
+            } else {
+              reject(new Error('Invalid image data URL'));
+            }
+          };
+          reader.onerror = () => reject(new Error('FileReader error'));
+          // Add timeout for mobile devices
+          setTimeout(() => reject(new Error('FileReader timeout')), 10000);
+        });
+      } catch (error) {
+        console.error("Image processing error:", error);
+        // Continue with other images even if one fails
+      }
     }
     setImages(newImages);
     setImagePreviews(newPreviews);
     setIsCompressing(false);
-    e.target.value = "";
+    e.target.value = ""; // Reset file input
     if (firstNewFile && images.length === 0) {
       // Run AI analysis in background (non-blocking)
       runAIAnalysis(firstNewFile, formData.description).catch(err => {

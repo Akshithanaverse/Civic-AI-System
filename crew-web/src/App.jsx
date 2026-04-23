@@ -9,9 +9,17 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Footer from "./components/Footer";
 import Profile from "./pages/Profile";
 
+// Debug component to show app is loading
+const DebugInfo = () => {
+  console.log("🚀 Crew Web App Loaded Successfully");
+  console.log("📡 API Base URL:", import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api");
+  return null; // Invisible component
+};
+
 function App() {
   return (
     <Router>
+      <DebugInfo /> {/* Add debug info */}
       <div className="min-h-screen flex flex-col">
         <div className="flex-1">
           <Routes>
@@ -54,6 +62,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Catch-all route for debugging */}
+            <Route path="*" element={<Login />} />
           </Routes>
         </div>
         <Footer />
