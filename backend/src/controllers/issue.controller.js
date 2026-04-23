@@ -345,6 +345,25 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
     console.log(`[BACKEND] Received image analysis request. Image size: ${image.length} chars, description: ${description ? 'yes' : 'no'}, testMode: ${testMode}, fastMode: ${fastMode}`);
     console.log(`[BACKEND] Calling AI service at ${AI_SERVICE_URL}/analyze-and-enhance`);
 
+    // TEMP: Return mock successful response to test UI
+    const mockResponse = {
+      predicted_category: "Pothole",
+      confidence_percent: 85.5,
+      enhanced_description: "A pothole has been detected on the road surface. This represents a significant safety hazard for vehicles and pedestrians. Immediate repair is recommended to prevent accidents and further damage to vehicles.",
+      severity_score: 4,
+      is_miscategorized: false,
+      urgency: {
+        level: 3,
+        label: "High",
+        keywords: ["safety", "hazard", "repair"]
+      },
+      ai_suggested: true
+    };
+
+    console.log(`[BACKEND] Returning mock AI response`);
+    res.status(200).json(mockResponse);
+
+    /*
     const startTime = Date.now();
     let url = `${AI_SERVICE_URL}/analyze-and-enhance`;
     const params = [];
@@ -364,6 +383,7 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
     console.log(`[BACKEND] Response status: ${aiResponse.status}`);
 
     res.status(200).json(aiResponse.data);
+    */
   } catch (error) {
     const errorTime = Date.now();
     console.error("[BACKEND] AI analyze-and-enhance error:", {
