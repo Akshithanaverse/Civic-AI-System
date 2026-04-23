@@ -356,7 +356,7 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
       image,
       description: description || ""
     }, {
-      timeout: 60000  // 20 seconds - should be fast with fallback
+      timeout: 120000  // 20 seconds - should be fast with fallback
     });
     const endTime = Date.now();
 
@@ -375,8 +375,18 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
     });
 
     if (error.code === 'ECONNABORTED') {
-      res.status(504).json({ error: "AI analysis timed out" });
-    } else if (error.response) {
+  // Return fallback instead of error so citizen-web doesn't break
+  return res.status(200).json({
+    predicted_category: "Uncategorized",
+    confidence_percent: 0,
+    enhanced_description: description || "",
+    severity_score: 2,
+    is_miscategorized: true,
+    urgency: { level: 1, label: "Low", keywords: [] },
+    ai_suggested: false,
+    method: "timeout_fallback"
+  });
+} else if (error.response) {
       res.status(error.response.status).json({ error: error.response.data });
     } else {
       res.status(500).json({ error: "Failed to analyze image" });
