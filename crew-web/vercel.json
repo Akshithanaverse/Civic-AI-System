@@ -2,5 +2,6 @@
   "framework": "vite",
   "buildCommand": "npm ci && npx vite build",
   "outputDirectory": "dist",
-  "installCommand": "npm install --include=dev"
+  "installCommand": "npm install --include=dev",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
