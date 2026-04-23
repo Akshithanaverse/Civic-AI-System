@@ -356,7 +356,7 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
       image,
       description: description || ""
     }, {
-      timeout: 120000  // 2 minutes - should be enough for HF space
+      timeout: 180000  // 3 minutes - HF spaces need time to spin up
     });
     const endTime = Date.now();
 
@@ -394,22 +394,19 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
       stack: error.stack
     });
 
-    if (error.code === 'ECONNABORTED') {
-  // Return fallback instead of error so citizen-web doesn't break
-  return res.status(200).json({
-    predicted_category: "Uncategorized",
-    confidence_percent: 0,
-    enhanced_description: description || "",
-    severity_score: 2,
-    is_miscategorized: true,
-    urgency: { level: 1, label: "Low", keywords: [] },
-    ai_suggested: false,
-    method: "timeout_fallback"
-  });
-} else if (error.response) {
-      res.status(error.response.status).json({ error: error.response.data });
-    } else {
-      res.status(500).json({ error: "Failed to analyze image" });
-    }
+    // FALLBACK: If AI service fails, return a basic response so the form still works
+    // User can still submit manually
+    console.log("[BACKEND] Returning fallback response due to AI service error");
+    return res.status(200).json({
+      predicted_category: "Uncategorized",
+      confidence_percent: 0,
+      enhanced_description: description || "Please provide a detailed description of the issue.",
+      severity_score: 2,
+      is_miscategorized: true,
+      urgency: { level: 1, label: "Low", keywords: [] },
+      ai_suggested: false,
+      method: "error_fallback",
+      error_reason: error.message
+    });
   }
 };
