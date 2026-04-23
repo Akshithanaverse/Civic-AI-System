@@ -345,6 +345,27 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
     console.log(`[BACKEND] Received image analysis request. Image size: ${image.length} chars, description: ${description ? 'yes' : 'no'}, testMode: ${testMode}, fastMode: ${fastMode}`);
     console.log(`[BACKEND] Calling AI service at ${AI_SERVICE_URL}/analyze-and-enhance`);
 
+    const startTime = Date.now();
+    let url = `${AI_SERVICE_URL}/analyze-and-enhance`;
+    const params = [];
+    if (testMode) params.push('test=true');
+    if (fastMode) params.push('fast=true');
+    if (params.length > 0) url += '?' + params.join('&');
+    
+    const aiResponse = await axios.post(url, {
+      image,
+      description: description || ""
+    }, {
+      timeout: 120000  // 2 minutes - should be enough for HF space
+    });
+    const endTime = Date.now();
+
+    console.log(`[BACKEND] AI service responded in ${endTime - startTime}ms`);
+    console.log(`[BACKEND] Response status: ${aiResponse.status}`);
+
+    res.status(200).json(aiResponse.data);
+
+    /*
     // TEMP: Return mock successful response to test UI
     const mockResponse = {
       predicted_category: "Pothole",
@@ -362,27 +383,6 @@ export const analyzeImageAndEnhance = async (req, res, next) => {
 
     console.log(`[BACKEND] Returning mock AI response`);
     res.status(200).json(mockResponse);
-
-    /*
-    const startTime = Date.now();
-    let url = `${AI_SERVICE_URL}/analyze-and-enhance`;
-    const params = [];
-    if (testMode) params.push('test=true');
-    if (fastMode) params.push('fast=true');
-    if (params.length > 0) url += '?' + params.join('&');
-    
-    const aiResponse = await axios.post(url, {
-      image,
-      description: description || ""
-    }, {
-      timeout: 120000  // 20 seconds - should be fast with fallback
-    });
-    const endTime = Date.now();
-
-    console.log(`[BACKEND] AI service responded in ${endTime - startTime}ms`);
-    console.log(`[BACKEND] Response status: ${aiResponse.status}`);
-
-    res.status(200).json(aiResponse.data);
     */
   } catch (error) {
     const errorTime = Date.now();
